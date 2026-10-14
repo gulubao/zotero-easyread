@@ -1,19 +1,28 @@
 /* SPDX-License-Identifier: MIT */
 var ZoteroEasyRead = {
   pluginID: "zotero-easyread@local.research",
-  version: "0.1.1",
+  version: "0.2.0",
   menus: [],
   busy: false,
   prefs: "extensions.zotero-easyread.",
+  paneID: "zotero-easyread-prefs",
 
-  defaultExecutable() { return PathUtils.join(Services.env.get("ProgramFiles") || "C:\\Program Files", "EasyRead", "EasyRead.exe"); },
+  defaultExecutable() {
+    if (Zotero.isMac) return "/Applications/EasyRead.app";
+    return PathUtils.join(Services.env.get("ProgramFiles") || "C:\\Program Files", "EasyRead", "EasyRead.exe");
+  },
+  appName() { return Zotero.isMac ? "EasyRead.app" : "EasyRead.exe"; },
 
   pref(key, fallback) { return Zotero.Prefs.get(this.prefs + key, true) ?? fallback; },
+  // Path settings default to "" in prefs.js, meaning "detect automatically".
+  pathPref(key, fallback) { return String(this.pref(key, "") || "").trim() || fallback; },
+  executable() { return this.pathPref("executable", this.defaultExecutable()); },
   legacyHome() { return PathUtils.join(Services.dirsvc.get("Home", Components.interfaces.nsIFile).path, "EasyRead"); },
-  home() { return this.resolvedHome || this.pref("home", this.legacyHome()); },
+  home() { return this.resolvedHome || this.pathPref("home", this.legacyHome()); },
   homeCandidates() {
-    const executable = this.pref("executable", this.defaultExecutable());
-    return [...new Set([this.pref("home",this.legacyHome()),PathUtils.join(PathUtils.parent(executable),"data"),this.legacyHome()].filter(Boolean))];
+    // Windows installs keep data in <installation>/data; a macOS .app bundle never does, its data stays in ~/EasyRead.
+    const installData = Zotero.isMac ? "" : PathUtils.join(PathUtils.parent(this.executable()),"data");
+    return [...new Set([this.pathPref("home",this.legacyHome()),installData,this.legacyHome()].filter(Boolean))];
   },
   bridgeDir() { return PathUtils.join(this.home(), "zotero-bridge"); },
   registryPath() { return PathUtils.join(Zotero.Profile.dir, "zotero-easyread.json"); },
@@ -57,14 +66,18 @@ var ZoteroEasyRead = {
     }};
     this.protocol._extensions["zotero://easyread"] = this.protocolExtension;
     if (this.menus.some(id => !id)) throw new Error("EasyRead 菜单注册失败。");
+    // A regular Zotero settings pane (Zotero → Settings → EasyRead) instead of an overlay drawn into the main window;
+    // it stays reachable from Zotero's own Settings even if the Tools menu entry never fires.
+    this.paneID = await Zotero.PreferencePanes.register({pluginID:this.pluginID,id:this.paneID,src:"prefs.xhtml",label:"EasyRead"});
     await this.writeJSON(PathUtils.join(Zotero.Profile.dir,"zotero-easyread-status.json"),{
-      ready:true,version:this.version,zoteroVersion:Zotero.version,menus:this.menus,started:new Date().toISOString()
+      ready:true,version:this.version,zoteroVersion:Zotero.version,menus:this.menus,pane:this.paneID,started:new Date().toISOString()
     });
   },
   stop() {
     this.alive = false;
     for (const id of this.menus) Zotero.MenuManager.unregisterMenu(id);
     this.menus = [];
+    Zotero.PreferencePanes.unregister(this.paneID);
     if (this.protocol?._extensions["zotero://easyread"] === this.protocolExtension) delete this.protocol._extensions["zotero://easyread"];
   },
   alert(message) { Services.prompt.alert(Zotero.getMainWindow(), "Zotero → EasyRead", String(message)); },
@@ -135,16 +148,18 @@ var ZoteroEasyRead = {
     }
     return null;
   },
-  launch() {
-    const executable = this.pref("executable", this.defaultExecutable());
-    // Pass a path and arguments, never evaluate a shell command.
-    Zotero.Utilities.Internal.exec(executable, []).catch(error => Zotero.logError(error));
+  // Pass a path and arguments, never evaluate a shell command. A macOS .app bundle is a folder that exec()
+  // refuses, so it is started (or brought to front, receiving any easyread:// link) through /usr/bin/open.
+  async openApp(args = []) {
+    const executable = this.executable();
+    if (Zotero.isMac) return Zotero.Utilities.Internal.exec("/usr/bin/open", ["-a", executable, ...args]);
+    return Zotero.Utilities.Internal.exec(executable, args);
   },
+  launch() { this.openApp().catch(error => Zotero.logError(error)); },
   async connect() {
     let conn = await this.probe();
     if (conn) return conn;
-    const executable = this.pref("executable", "D:\\Program Files\\EasyRead\\EasyRead.exe");
-    if (!await IOUtils.exists(executable)) throw new Error("找不到 EasyRead.exe，请在“工具 → EasyRead：连接设置”中设置路径。");
+    if (!await IOUtils.exists(this.executable())) throw new Error(`找不到 ${this.appName()}，请在 Zotero 设置 → EasyRead 中设置路径。`);
     this.launch();
     for (let i = 0; i < 60 && this.alive; i++) {
       await Zotero.Promise.delay(500); conn = await this.probe(); if (conn) return conn;
@@ -208,9 +223,13 @@ var ZoteroEasyRead = {
     if (id && !EasyReadCore.validID(id)) throw new Error("无效的 EasyRead 论文标识。");
     if (conn.api === 1) {
       const target = id ? EasyReadCore.officialOpen(id,anchor,sha256) : "";
-      const executable = this.pref("executable",this.defaultExecutable());
-      if (await IOUtils.exists(executable)) {
-        try { await Zotero.Utilities.Internal.exec(executable,target ? ["easyread://" + target] : []); return; }
+      if (await IOUtils.exists(this.executable())) {
+        try { await this.openApp(target ? ["easyread://" + target] : []); return; }
+        catch (error) { Zotero.logError(error); }
+      }
+      // macOS: the app may live elsewhere; whichever copy registered easyread:// still handles the link.
+      if (Zotero.isMac && target) {
+        try { Zotero.launchURL("easyread://" + target); return; }
         catch (error) { Zotero.logError(error); }
       }
       Zotero.launchURL(conn.url + (target ? "/" + target : "/"));
@@ -306,29 +325,5 @@ var ZoteroEasyRead = {
     for (const item of items) files.push(...await this.prepare([item]));
     return this.sync(files);
   },
-  settings() {
-    const window = Zotero.getMainWindow(), doc = window.document;
-    if (doc.getElementById("zotero-easyread-settings")) return;
-    const make = (tag, text) => { const elem = doc.createElementNS("http://www.w3.org/1999/xhtml",tag); if (text) elem.textContent = text; return elem; };
-    const overlay = make("div"); overlay.id = "zotero-easyread-settings";
-    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#0006;display:flex;align-items:center;justify-content:center;font:14px sans-serif";
-    const panel = make("div"); panel.style.cssText = "background:#fff;color:#172033;border-radius:12px;padding:24px;width:550px;box-shadow:0 12px 50px #0004";
-    panel.append(make("h2","EasyRead 连接设置"));
-    const fields = {};
-    for (const [key,label,value] of [["executable","EasyRead.exe 路径",this.pref("executable",this.defaultExecutable())],["home","EasyRead 数据目录（含 .server.json）",this.home()]]) {
-      const row = make("label",label); row.style.cssText = "display:block;margin:16px 0";
-      const input = make("input"); input.value = value; input.style.cssText = "display:block;box-sizing:border-box;width:100%;padding:8px;margin-top:6px";
-      row.append(input); panel.append(row); fields[key] = input;
-    }
-    for (const [key,label,defaultValue] of [["translate","首次单篇阅读自动翻译（使用 EasyRead 已配置模型）",true],["includeAI","同步保存到页边的 AI 回答，不同步完整聊天记录",true],["englishContext","在摘录下附上对应段落英文",true]]) {
-      const row = make("label"); row.style.cssText = "display:block;margin:12px 0";
-      const input = make("input"); input.type = "checkbox"; input.checked = this.pref(key,defaultValue); row.append(input,make("span",label)); panel.append(row); fields[key] = input;
-    }
-    panel.append(make("p","批量发送始终先不翻译。同步方向为 EasyRead → Zotero；在 Zotero 手动编辑专属笔记后，同步会保留旧版本。"));
-    const buttons = make("div"); buttons.style.cssText = "display:flex;justify-content:flex-end;gap:12px;margin-top:18px";
-    const cancel = make("button","取消"), save = make("button","保存");
-    cancel.onclick = () => overlay.remove();
-    save.onclick = () => { for (const [key,input] of Object.entries(fields)) Zotero.Prefs.set(this.prefs+key,input.type === "checkbox" ? input.checked : input.value.trim(),true); overlay.remove(); };
-    buttons.append(cancel,save); panel.append(buttons); overlay.append(panel); doc.documentElement.append(overlay);
-  }
+  settings() { Zotero.Utilities.Internal.openPreferences(this.paneID); }
 };

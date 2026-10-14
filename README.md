@@ -19,15 +19,17 @@
 
 ## 安装
 
-已做真实软件测试的环境为 **Windows、Zotero 10.0.5-beta.2、EasyRead 1.3.0 与 1.3.2**。其他 Zotero 8–10 版本和其他平台尚未完成真实集成测试，不能保证兼容。
+已做真实软件测试的环境为 **Windows、Zotero 10.0.5-beta.2、EasyRead 1.3.0 与 1.3.2**，以及 **macOS、Zotero 10.0.6、EasyRead 1.4.2**。其他 Zotero 8–10 版本和 Linux 尚未完成真实集成测试，不能保证兼容。
 
-1. 从本仓库 [Releases](https://github.com/apple5089/zotero-easyread/releases) 下载最新 XPI。
+1. 用 `python3 build.py` 生成 `dist/zotero-easyread-<版本>.xpi`（或从 Releases 下载）。
 2. Zotero → 工具 → 插件 → 齿轮菜单 → 从文件安装插件，选择 XPI。
-3. 启动 EasyRead。Zotero → 工具 → EasyRead：连接设置，填写 EasyRead 可执行文件路径；插件会依次检查已设置的目录、安装目录下的 `data` 和用户目录下的 `EasyRead`。
+3. 启动 EasyRead。默认安装位置无需设置：macOS 为 `/Applications/EasyRead.app`，Windows 为 `C:\Program Files\EasyRead\EasyRead.exe`。装在别处时到 **Zotero 设置 → EasyRead**（也可从“工具 → EasyRead：连接设置…”进入）填写路径，留空即自动检测。插件会依次检查已设置的数据目录、Windows 安装目录下的 `data` 和用户目录下的 `EasyRead`。
 4. 右键文献或已下载的 PDF 附件 → **Zotero → EasyRead** 子菜单 → 用 EasyRead 阅读。
 5. 阅读后在同一条目上执行“同步 EasyRead 阅读笔记”。
 
-首次单篇导入默认请求翻译，可在连接设置中关闭。批量发送始终不自动翻译。EasyRead 1.3.1+ 通过官方入口直接在桌面打开；旧版未安装桌面桥时在本机浏览器打开阅读页。
+macOS 上插件通过 `open -a EasyRead.app easyread://open?...` 打开桌面版并定位段落；找不到程序时交给系统注册的 `easyread://` 处理程序，再不行才用浏览器打开本机阅读页。
+
+首次单篇导入默认请求翻译，可在设置中关闭。批量发送始终不自动翻译。EasyRead 1.3.1+ 通过官方入口直接在桌面打开；旧版未安装桌面桥时在本机浏览器打开阅读页。
 
 PDF 必须已下载到本机，最大 200 MB。文献包含多个 PDF 时默认使用 Zotero 首选 PDF，也可明确选中某个附件。独立 PDF 需关联文献后才能回写子笔记；只读文献库无法回写。
 

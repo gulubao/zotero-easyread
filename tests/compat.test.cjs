@@ -1,13 +1,13 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const fs=require('node:fs'),path=require('node:path');
 const core=require('../zotero/core.js');
-function bridge(prefs={},http=async()=>{throw {status:404};}) {
-  const calls=[],launched=[],reads=[];
+function bridge(prefs={},http=async()=>{throw {status:404};},{mac=false,exists=async()=>true}={}) {
+  const calls=[],launched=[],reads=[],p=mac?path.posix:path.win32;
   const ctx={EasyReadCore:core,Components:{interfaces:{nsIFile:{}}},
-    PathUtils:{join:path.win32.join,parent:path.win32.dirname},
-    Services:{env:{get:()=> 'C:\\Program Files'},dirsvc:{get:()=>({path:'C:\\User'})}},
-    IOUtils:{exists:async()=>true},
-    Zotero:{Prefs:{get:key=>prefs[key.replace('extensions.zotero-easyread.','')]},
+    PathUtils:{join:p.join,parent:p.dirname},
+    Services:{env:{get:()=> mac?'':'C:\\Program Files'},dirsvc:{get:()=>({path:mac?'/Users/x':'C:\\User'})}},
+    IOUtils:{exists},
+    Zotero:{isMac:mac,Prefs:{get:key=>prefs[key.replace('extensions.zotero-easyread.','')]},
       HTTP:{request:async(method,url)=>{calls.push(url);return http(url);}},
       Utilities:{Internal:{exec:async(exe,args)=>launched.push({exe,args})}},
       logError(){},launchURL:url=>launched.push({url})}};
@@ -48,4 +48,29 @@ test('read only documented parts and never the side-effecting state endpoint',as
 test('batch import focuses native application without opening a browser tab',async()=>{
   const b=bridge();await b.owner.navigate({api:1,url:'http://127.0.0.1:52341'},'');
   assert.equal(b.launched.length,1);assert.equal(b.launched[0].args.length,0);
+});
+// Values created inside the vm context have that realm's prototypes.
+const plain=value=>JSON.parse(JSON.stringify(value));
+test('macOS defaults: app bundle, ~/EasyRead, blank settings mean auto-detect',()=>{
+  const b=bridge({executable:'',home:'  '},undefined,{mac:true});
+  assert.equal(b.owner.executable(),'/Applications/EasyRead.app');
+  assert.equal(b.owner.home(),'/Users/x/EasyRead');
+  assert.deepEqual(plain(b.owner.homeCandidates()),['/Users/x/EasyRead']);
+  const custom=bridge({executable:'/Users/x/Applications/EasyRead.app',home:'/data/er'},undefined,{mac:true});
+  assert.equal(custom.owner.executable(),'/Users/x/Applications/EasyRead.app');
+  assert.deepEqual(plain(custom.owner.homeCandidates()),['/data/er','/Users/x/EasyRead']);
+});
+test('macOS desktop link goes through open -a, never exec on the .app folder',async()=>{
+  const b=bridge({},undefined,{mac:true});
+  await b.owner.navigate({api:1,url:'http://127.0.0.1:52341'},'abcdef123456','p3-2','a'.repeat(64));
+  assert.deepEqual(plain(b.launched),[{exe:'/usr/bin/open',args:['-a','/Applications/EasyRead.app','easyread://open?sha256='+'a'.repeat(64)+'&block=p3-2']}]);
+  b.launched.length=0;await b.owner.navigate({api:1,url:'http://127.0.0.1:52341'},'');
+  assert.deepEqual(plain(b.launched),[{exe:'/usr/bin/open',args:['-a','/Applications/EasyRead.app']}]);
+});
+test('macOS without the app at the configured path still uses the registered easyread:// handler',async()=>{
+  const b=bridge({},undefined,{mac:true,exists:async()=>false});
+  await b.owner.navigate({api:1,url:'http://127.0.0.1:52341'},'abcdef123456');
+  assert.deepEqual(plain(b.launched),[{url:'easyread://open?id=abcdef123456'}]);
+  b.owner.probe=async()=>null;
+  await assert.rejects(b.owner.connect(),/找不到 EasyRead\.app/);
 });

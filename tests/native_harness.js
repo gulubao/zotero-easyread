@@ -11,6 +11,23 @@ async function runNativeTests() {
     await Zotero.uiReadyPromise;
     check("official context and tools menus registered",owner.menus.length===2&&owner.menus.every(Boolean));
     check("custom reading protocol registered",!!owner.protocol._extensions['zotero://easyread']);
+    check("settings pane registered",Zotero.PreferencePanes.pluginPanes.some(p=>p.id===owner.paneID));
+    check("default settings loaded",Zotero.Prefs.get(owner.prefs+"translate",true)===true&&Zotero.Prefs.get(owner.prefs+"executable",true)==="");
+    if(Zotero.isMac) check("macOS app bundle and data directory detected",owner.executable()==="/Applications/EasyRead.app"&&owner.homeCandidates().every(h=>!h.startsWith("/Applications")));
+    owner.settings();
+    let field;
+    for(let n=0;n<60&&!field;n++){await Zotero.Promise.delay(250);field=Services.wm.getMostRecentWindow("zotero:pref")?.document.getElementById("zotero-easyread-executable");}
+    check("settings pane opens from the Tools command",!!field);
+    await Zotero.Promise.delay(500);
+    const prefDoc=field.ownerDocument,prefWin=prefDoc.defaultView;
+    report.paneRect=JSON.parse(JSON.stringify(field.getBoundingClientRect()));
+    check("settings pane is visible",report.paneRect.width>0&&report.paneRect.height>0);
+    check("settings pane shows saved data directory",prefDoc.getElementById("zotero-easyread-home").value===owner.pref("home"));
+    check("settings pane shows checkbox defaults",prefDoc.getElementById("zotero-easyread-translate").checked===true);
+    await IOUtils.writeUTF8(PathUtils.join(TEST_ROOT,"pane-open"),"1");await Zotero.Promise.delay(4000);
+    field.value="/tmp/Custom EasyRead.app";field.dispatchEvent(new prefWin.Event("input"));
+    check("settings pane saves edits",Zotero.Prefs.get(owner.prefs+"executable",true)==="/tmp/Custom EasyRead.app"&&owner.executable()==="/tmp/Custom EasyRead.app");
+    Zotero.Prefs.set(owner.prefs+"executable","",true);prefWin.close();
     const article=new Zotero.Item("journalArticle");article.setField("title","Native integration test");await article.saveTx();
     const attachment=await Zotero.Attachments.importFromFile({file:PathUtils.join(TEST_ROOT,"fixtures","alpha.pdf"),parentItemID:article.id});
     let files=await owner.prepare([article,attachment]);check("parent and attachment selection deduplicated",files.length===1);

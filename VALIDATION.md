@@ -12,6 +12,10 @@ The initial local implementation passed 6 Node tests, 2 Python archive tests, 18
 
 The public package removes machine-specific defaults and recovery scripts. Its core unit tests run without installed applications. Generic public installation scripts have been checked for PowerShell syntax; automated live installation across multiple Windows configurations has not been performed.
 
+## macOS (0.2.0)
+
+macOS, Zotero `10.0.6`, EasyRead `1.4.2` (bundled backend `easyread-backend serve --port 0` with a separate `EASYREAD_HOME`). `tests/setup_native.py` works unchanged; launch `/Applications/Zotero.app/Contents/MacOS/zotero -no-remote -profile <absolute test-work/profile> -purgecaches`. All 26 checks passed, including: settings pane registered, defaults loaded, `/Applications/EasyRead.app` and `~/EasyRead` detected, pane opened from the Tools command, visible, showing saved values and saving edits. `open -a /Applications/EasyRead.app "easyread://open?sha256=…&block=…"` opened the paper in the running desktop app (its `last_opened` updated).
+
 ## Core checks
 
 ```bash

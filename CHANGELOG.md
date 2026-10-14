@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-10-14
+
+- macOS support: default to `/Applications/EasyRead.app` and `~/EasyRead`, start or focus the app and deliver `easyread://open` links through `/usr/bin/open -a` (an `.app` bundle cannot be passed to `exec`), fall back to the system `easyread://` handler, then to the local reader page.
+- Settings moved to a regular Zotero settings pane (Zotero Settings → EasyRead); the Tools menu entry opens it. Blank paths mean auto-detect, defaults come from `prefs.js`.
+- Removed the hard-coded `D:\Program Files\EasyRead\EasyRead.exe` fallback when EasyRead is not running.
+- Update URL points to this fork so upstream releases do not replace it.
+- Verified on macOS with Zotero 10.0.6 and EasyRead 1.4.2: 26 native harness checks (including settings pane open/visible/save) and a real `easyread://` jump to a paragraph.
+
 ## 0.1.1 — 2026-10-05
 
 - Discover EasyRead's migrated Windows `<installation>/data` directory automatically while preserving explicitly configured live custom directories.

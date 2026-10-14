@@ -19,13 +19,15 @@ Sync is **manual and one-way, EasyRead → Zotero**. It does not create native Z
 
 ## Installation
 
-Real integration tests cover **Windows, Zotero 10.0.5-beta.2, and EasyRead 1.3.0 / 1.3.2**. Other Zotero 8–10 versions and other platforms are unverified.
+Real integration tests cover **Windows, Zotero 10.0.5-beta.2, and EasyRead 1.3.0 / 1.3.2**, and **macOS, Zotero 10.0.6, and EasyRead 1.4.2**. Other Zotero 8–10 versions and Linux are unverified.
 
-1. Download the latest XPI from [Releases](https://github.com/apple5089/zotero-easyread/releases).
+1. Build `dist/zotero-easyread-<version>.xpi` with `python3 build.py` (or download it from Releases).
 2. In Zotero, open Tools → Plugins → gear menu → Install Plugin From File.
-3. Start EasyRead. In Tools → EasyRead connection settings, configure its executable path. Discovery checks the configured data directory, `<installation>/data`, then `~/EasyRead`. Menu labels are currently Chinese.
+3. Start EasyRead. Default locations need no setup: `/Applications/EasyRead.app` on macOS, `C:\Program Files\EasyRead\EasyRead.exe` on Windows. Otherwise set the path in **Zotero Settings → EasyRead** (also opened by Tools → `EasyRead：连接设置…`); blank means auto-detect. Discovery checks the configured data directory, `<installation>/data` on Windows, then `~/EasyRead`. Menu labels are currently Chinese.
 4. Right-click an item/PDF → Zotero → EasyRead → `用 EasyRead 阅读`.
 5. After reading, choose `同步 EasyRead 阅读笔记` on the same item.
+
+On macOS the plugin opens the desktop app with `open -a EasyRead.app easyread://open?...`; if the app is not at the configured path it hands the link to whichever app registered `easyread://`, and only then falls back to the local reader page in a browser.
 
 The first single-paper import requests translation by default; this can be disabled in settings. Batch import never starts translation automatically. EasyRead 1.3.1+ opens through its official desktop protocol, without an archive patch. Older unpatched releases open in a local browser.
 
