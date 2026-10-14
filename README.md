@@ -17,12 +17,29 @@
 
 同步是 **手动、单向 EasyRead → Zotero**。不创建 Zotero PDF 原文高亮，不合并两边任意修改，不同步完整 AI 聊天记录。翻译与问答沿用 EasyRead 中配置的模型及其费用规则。
 
+## 生成 XPI
+
+XPI 就是 Zotero 插件的安装包。本仓库不提交 XPI，需要自己从源码生成：只用 Python 3 标准库，不用装任何依赖。
+
+```bash
+git clone https://github.com/gulubao/zotero-easyread.git
+cd zotero-easyread
+python3 build.py
+```
+
+Windows 上把 `python3` 换成 `py`。运行后输出两个文件和它们的 SHA-256：
+
+- `dist/zotero-easyread-<版本>.xpi`：安装到 Zotero 用的就是这个。里面是 `zotero/` 目录下的全部文件（`manifest.json`、`bootstrap.js`、`bridge.js`、`core.js`、`prefs.js`、`prefs.xhtml`）加上 `LICENSE`。
+- `dist/zotero-easyread-<版本>.zip`：源码包（XPI、文档、测试），分发用，安装时用不到。
+
+`<版本>` 取自 `zotero/manifest.json` 的 `version`。改了代码要重新运行 `python3 build.py`，再按下面第 2 步重新安装；建议同时提高 `zotero/manifest.json` 和 `zotero/bridge.js` 里的 `version`，便于在 Zotero 插件列表里分辨装的是哪一版。插件 ID 不变，新版会直接替换旧版，关联记录和设置都保留。
+
 ## 安装
 
 已做真实软件测试的环境为 **Windows、Zotero 10.0.5-beta.2、EasyRead 1.3.0 与 1.3.2**，以及 **macOS、Zotero 10.0.6、EasyRead 1.4.2**。其他 Zotero 8–10 版本和 Linux 尚未完成真实集成测试，不能保证兼容。
 
-1. 用 `python3 build.py` 生成 `dist/zotero-easyread-<版本>.xpi`（或从 Releases 下载）。
-2. Zotero → 工具 → 插件 → 齿轮菜单 → 从文件安装插件，选择 XPI。
+1. 按上一节生成 `dist/zotero-easyread-<版本>.xpi`。
+2. Zotero → 工具 → 插件 → 齿轮菜单 → 从文件安装插件，选择这个 XPI。
 3. 启动 EasyRead。默认安装位置无需设置：macOS 为 `/Applications/EasyRead.app`，Windows 为 `C:\Program Files\EasyRead\EasyRead.exe`。装在别处时到 **Zotero 设置 → EasyRead**（也可从“工具 → EasyRead：连接设置…”进入）填写路径，留空即自动检测。插件会依次检查已设置的数据目录、Windows 安装目录下的 `data` 和用户目录下的 `EasyRead`。
 4. 右键文献或已下载的 PDF 附件 → **Zotero → EasyRead** 子菜单 → 用 EasyRead 阅读。
 5. 阅读后在同一条目上执行“同步 EasyRead 阅读笔记”。

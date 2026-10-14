@@ -17,12 +17,29 @@ This is an independent community integration. Thanks to [@Edwardxlai](https://gi
 
 Sync is **manual and one-way, EasyRead → Zotero**. It does not create native Zotero PDF annotations, merge arbitrary edits in both applications, or copy full AI chat histories. Translation and questions use the models and costs configured in EasyRead.
 
+## Building the XPI
+
+The XPI is the Zotero plugin package. It is not committed to this repository; build it from source. Only the Python 3 standard library is needed.
+
+```bash
+git clone https://github.com/gulubao/zotero-easyread.git
+cd zotero-easyread
+python3 build.py
+```
+
+On Windows use `py` instead of `python3`. The script prints two files with their SHA-256:
+
+- `dist/zotero-easyread-<version>.xpi` is what you install in Zotero. It contains everything under `zotero/` (`manifest.json`, `bootstrap.js`, `bridge.js`, `core.js`, `prefs.js`, `prefs.xhtml`) plus `LICENSE`.
+- `dist/zotero-easyread-<version>.zip` is a source bundle (XPI, docs, tests) for distribution; not needed for installation.
+
+`<version>` comes from `version` in `zotero/manifest.json`. After changing code, run `python3 build.py` again and reinstall with step 2 below. Bumping `version` in both `zotero/manifest.json` and `zotero/bridge.js` makes it easy to see which build Zotero has loaded. The plugin ID stays the same, so a new build replaces the old one and keeps its links and settings.
+
 ## Installation
 
 Real integration tests cover **Windows, Zotero 10.0.5-beta.2, and EasyRead 1.3.0 / 1.3.2**, and **macOS, Zotero 10.0.6, and EasyRead 1.4.2**. Other Zotero 8–10 versions and Linux are unverified.
 
-1. Build `dist/zotero-easyread-<version>.xpi` with `python3 build.py` (or download it from Releases).
-2. In Zotero, open Tools → Plugins → gear menu → Install Plugin From File.
+1. Build `dist/zotero-easyread-<version>.xpi` as described above.
+2. In Zotero, open Tools → Plugins → gear menu → Install Plugin From File and choose that XPI.
 3. Start EasyRead. Default locations need no setup: `/Applications/EasyRead.app` on macOS, `C:\Program Files\EasyRead\EasyRead.exe` on Windows. Otherwise set the path in **Zotero Settings → EasyRead** (also opened by Tools → `EasyRead：连接设置…`); blank means auto-detect. Discovery checks the configured data directory, `<installation>/data` on Windows, then `~/EasyRead`. Menu labels are currently Chinese.
 4. Right-click an item/PDF → Zotero → EasyRead → `用 EasyRead 阅读`.
 5. After reading, choose `同步 EasyRead 阅读笔记` on the same item.
