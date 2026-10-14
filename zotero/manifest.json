@@ -6,7 +6,6 @@
   "author": "apple5089",
   "applications": {"zotero": {
     "id": "zotero-easyread@local.research",
-    "update_url": "https://raw.githubusercontent.com/gulubao/zotero-easyread/main/updates.json",
     "strict_min_version": "8.0",
     "strict_max_version": "10.0.*"
   }}

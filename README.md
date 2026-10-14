@@ -4,7 +4,7 @@
 
 在 Zotero 管理论文，用 EasyRead 阅读。右键发送 PDF，复用已有译文和阅读记录，再把阅读笔记手动同步回 Zotero。
 
-这是独立的社区集成项目。感谢 [@Edwardxlai](https://github.com/Edwardxlai) 开发 EasyRead；本项目未获得 EasyRead 官方维护或背书。
+本仓库基于 [apple5089/zotero-easyread](https://github.com/apple5089/zotero-easyread) 修改，增加了 macOS 支持和 Zotero 设置页。这是独立的社区集成项目。感谢 [@Edwardxlai](https://github.com/Edwardxlai) 开发 EasyRead、[@apple5089](https://github.com/apple5089) 开发原插件；本项目未获得 EasyRead 官方维护或背书。
 
 ## 功能
 
@@ -12,14 +12,14 @@
 - 多选“发送到 EasyRead（批量，先不翻译）”：每批最多 20 篇。
 - 右键“同步 EasyRead 阅读笔记”：整篇心得、划线、批注、问题、原 PDF 页序号、段落英文和保存到页边的 AI 回答，写入文献的专属子笔记。
 - 同步内容不变时复用笔记。在 Zotero 手动编辑专属笔记后，保留该版本并创建新的受管理版本。
-- “返回 EasyRead”链接可打开同一 PDF；EasyRead 1.3.1+ 直接使用官方桌面入口定位段落，无需桌面补丁。
+- “返回 EasyRead”链接可打开同一 PDF，并通过 EasyRead 1.3.1+ 的官方 `easyread://open` 入口在桌面版定位段落。
 - 自动发现本机服务端口，无需固定端口或云端中转。
 
 同步是 **手动、单向 EasyRead → Zotero**。不创建 Zotero PDF 原文高亮，不合并两边任意修改，不同步完整 AI 聊天记录。翻译与问答沿用 EasyRead 中配置的模型及其费用规则。
 
 ## 生成 XPI
 
-XPI 就是 Zotero 插件的安装包。本仓库不提交 XPI，需要自己从源码生成：只用 Python 3 标准库，不用装任何依赖。
+XPI 就是 Zotero 插件的安装包。可以直接从 [Releases](https://github.com/gulubao/zotero-easyread/releases) 下载，也可以从源码生成：只用 Python 3 标准库，不用装任何依赖。
 
 ```bash
 git clone https://github.com/gulubao/zotero-easyread.git
@@ -27,18 +27,15 @@ cd zotero-easyread
 python3 build.py
 ```
 
-Windows 上把 `python3` 换成 `py`。运行后输出两个文件和它们的 SHA-256：
-
-- `dist/zotero-easyread-<版本>.xpi`：安装到 Zotero 用的就是这个。里面是 `zotero/` 目录下的全部文件（`manifest.json`、`bootstrap.js`、`bridge.js`、`core.js`、`prefs.js`、`prefs.xhtml`）加上 `LICENSE`。
-- `dist/zotero-easyread-<版本>.zip`：源码包（XPI、文档、测试），分发用，安装时用不到。
+Windows 上把 `python3` 换成 `py`。运行后生成 `dist/zotero-easyread-<版本>.xpi` 并打印它的 SHA-256。XPI 里是 `zotero/` 目录下的全部文件（`manifest.json`、`bootstrap.js`、`bridge.js`、`core.js`、`prefs.js`、`prefs.xhtml`）加上 `LICENSE`。`dist/` 不进 Git。
 
 `<版本>` 取自 `zotero/manifest.json` 的 `version`。改了代码要重新运行 `python3 build.py`，再按下面第 2 步重新安装；建议同时提高 `zotero/manifest.json` 和 `zotero/bridge.js` 里的 `version`，便于在 Zotero 插件列表里分辨装的是哪一版。插件 ID 不变，新版会直接替换旧版，关联记录和设置都保留。
 
 ## 安装
 
-已做真实软件测试的环境为 **Windows、Zotero 10.0.5-beta.2、EasyRead 1.3.0 与 1.3.2**，以及 **macOS、Zotero 10.0.6、EasyRead 1.4.2**。其他 Zotero 8–10 版本和 Linux 尚未完成真实集成测试，不能保证兼容。
+已做真实软件测试的环境为 **macOS、Zotero 10.0.6、EasyRead 1.4.2**；原插件在 **Windows、Zotero 10.0.5-beta.2、EasyRead 1.3.0 与 1.3.2** 上测试过。其他 Zotero 8–10 版本和 Linux 尚未测试，不能保证兼容。
 
-1. 按上一节生成 `dist/zotero-easyread-<版本>.xpi`。
+1. 从 Releases 下载 `zotero-easyread-<版本>.xpi`，或按上一节自己生成。
 2. Zotero → 工具 → 插件 → 齿轮菜单 → 从文件安装插件，选择这个 XPI。
 3. 启动 EasyRead。默认安装位置无需设置：macOS 为 `/Applications/EasyRead.app`，Windows 为 `C:\Program Files\EasyRead\EasyRead.exe`。装在别处时到 **Zotero 设置 → EasyRead**（也可从“工具 → EasyRead：连接设置…”进入）填写路径，留空即自动检测。插件会依次检查已设置的数据目录、Windows 安装目录下的 `data` 和用户目录下的 `EasyRead`。
 4. 右键文献或已下载的 PDF 附件 → **Zotero → EasyRead** 子菜单 → 用 EasyRead 阅读。
@@ -46,45 +43,16 @@ Windows 上把 `python3` 换成 `py`。运行后输出两个文件和它们的 S
 
 macOS 上插件通过 `open -a EasyRead.app easyread://open?...` 打开桌面版并定位段落；找不到程序时交给系统注册的 `easyread://` 处理程序，再不行才用浏览器打开本机阅读页。
 
-首次单篇导入默认请求翻译，可在设置中关闭。批量发送始终不自动翻译。EasyRead 1.3.1+ 通过官方入口直接在桌面打开；旧版未安装桌面桥时在本机浏览器打开阅读页。
+首次单篇导入默认请求翻译，可在设置中关闭。批量发送始终不自动翻译。
 
 PDF 必须已下载到本机，最大 200 MB。文献包含多个 PDF 时默认使用 Zotero 首选 PDF，也可明确选中某个附件。独立 PDF 需关联文献后才能回写子笔记；只读文献库无法回写。
 
-## 仅旧版可选：EasyRead 1.3.0 桌面桥
-
-EasyRead 1.3.1+ 使用官方 `easyread://open` 协议，**不用执行下面的补丁操作**。新版 API 约定见 [EasyRead docs/api.md](https://github.com/Edwardxlai/easyread/blob/main/docs/api.md)。
-
-桌面桥给本机安装的 EasyRead 增加一个小模块，以本地文件传递跳转请求。补丁工具只接受已识别的 Electron 主程序结构，保存原程序备份。**EasyRead 更新后可能覆盖补丁**；届时浏览器阅读仍可使用。
-
-需要 Python 3.10+ 和 PowerShell 7+。从源码或 ZIP 解压后，正常关闭 EasyRead，执行：
-
-```powershell
-python desktop/patch_asar.py --source "C:\Program Files\EasyRead\resources\app.asar"
-pwsh -File install.ps1 -EasyReadDir "C:\Program Files\EasyRead"
-```
-
-路径请按实际安装位置修改。若系统权限要求，以管理员身份运行桌面安装脚本。脚本只安装桌面桥，不复制、启用其他 Zotero 插件，不关闭或升级任何软件。
-
-撤回桌面补丁：正常关闭 EasyRead，再运行 `pwsh -File restore.ps1`。Zotero 插件可在插件管理页单独卸载。恢复不删除阅读缓存或笔记。
-
-## 开发与测试
-
-无需 npm / pip 第三方依赖；Node.js 22+、Python 3.10+ 即可：
-
-```bash
-node --test tests/core.test.cjs tests/compat.test.cjs
-python -m unittest discover -s tests -p "test_*.py" -v
-python build.py
-```
-
-构建输出为 XPI 和仅包含集成源码的 ZIP，不分发 EasyRead 程序。GitHub Actions 在 Windows、macOS、Linux 运行核心单元测试；这不代表三个平台都通过了真实软件集成测试。真实测试流程见 [VALIDATION.md](VALIDATION.md)。
-
 ## 数据与兼容
 
-关联记录保存在 Zotero 配置目录的 `zotero-easyread.json`；启动状态在 `zotero-easyread-status.json`。桌面跳转状态在 EasyRead 数据目录的 `zotero-bridge/`。请勿公开这些运行数据或模型配置。
+关联记录保存在 Zotero 配置目录的 `zotero-easyread.json`；启动状态在 `zotero-easyread-status.json`。请勿公开这些运行数据或模型配置。
 
-当前使用 EasyRead 文档中的 API v1、PDF 指纹和阅读数据结构，以及 Zotero MenuManager。旧版保留 API 与桌面桥兼容路径。PDF 内容替换后会关联新版本，保留旧版本笔记；未知 API 版本会明确提示更新插件。
+当前使用 [EasyRead 文档](https://github.com/Edwardxlai/easyread/blob/main/docs/api.md)中的 API v1、PDF 指纹和阅读数据结构，以及 Zotero MenuManager 与设置页接口。PDF 内容替换后会关联新版本，保留旧版本笔记；未知 API 版本会明确提示更新插件。插件不检查自动更新，新版本请到 Releases 下载后重新安装。
 
-## 许可证与贡献
+## 许可证
 
-集成代码使用 [MIT](LICENSE)。EasyRead 及其他依赖的归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。欢迎反馈问题或提交聚焦单一变更的 PR，见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+[MIT](LICENSE)。
