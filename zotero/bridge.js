@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 var ZoteroEasyRead = {
   pluginID: "zotero-easyread@local.research",
-  version: "0.2.0",
+  version: "0.3.1",
   menus: [],
   busy: false,
   prefs: "extensions.zotero-easyread.",
@@ -9,9 +9,10 @@ var ZoteroEasyRead = {
 
   defaultExecutable() {
     if (Zotero.isMac) return "/Applications/EasyRead.app";
+    if (Zotero.isLinux) return "";
     return PathUtils.join(Services.env.get("ProgramFiles") || "C:\\Program Files", "EasyRead", "EasyRead.exe");
   },
-  appName() { return Zotero.isMac ? "EasyRead.app" : "EasyRead.exe"; },
+  appName() { return Zotero.isMac ? "EasyRead.app" : Zotero.isLinux ? "EasyRead.AppImage" : "EasyRead.exe"; },
 
   pref(key, fallback) { return Zotero.Prefs.get(this.prefs + key, true) ?? fallback; },
   // Path settings default to "" in prefs.js, meaning "detect automatically".
@@ -20,8 +21,8 @@ var ZoteroEasyRead = {
   legacyHome() { return PathUtils.join(Services.dirsvc.get("Home", Components.interfaces.nsIFile).path, "EasyRead"); },
   home() { return this.resolvedHome || this.pathPref("home", this.legacyHome()); },
   homeCandidates() {
-    // Windows installs keep data in <installation>/data; a macOS .app bundle never does, its data stays in ~/EasyRead.
-    const installData = Zotero.isMac ? "" : PathUtils.join(PathUtils.parent(this.executable()),"data");
+    // Windows installs keep data in <installation>/data. macOS and Ubuntu keep it in ~/EasyRead.
+    const installData = Zotero.isWin ? PathUtils.join(PathUtils.parent(this.executable()),"data") : "";
     return [...new Set([this.pathPref("home",this.legacyHome()),installData,this.legacyHome()].filter(Boolean))];
   },
   bridgeDir() { return PathUtils.join(this.home(), "zotero-bridge"); },
@@ -148,18 +149,137 @@ var ZoteroEasyRead = {
     }
     return null;
   },
+  homeDir() { return Services.dirsvc.get("Home", Components.interfaces.nsIFile).path; },
+  async listChildren(dir) {
+    try { return await IOUtils.getChildren(dir); }
+    catch (_) { return []; }
+  },
+  async isFile(path) {
+    try { return (await IOUtils.stat(path)).type !== "directory"; }
+    catch (_) { return false; }
+  },
+  async newestFile(paths) {
+    let best = "", stamp = -1;
+    for (const path of paths) {
+      try {
+        const stat = await IOUtils.stat(path);
+        if (stat.type === "directory") continue;
+        const modified = stat.lastModified || 0;
+        if (modified >= stamp) { stamp = modified; best = path; }
+      } catch (_) {}
+    }
+    return best;
+  },
+  // A configured path wins. Ubuntu has no single install location: look for an AppImage, then a
+  // registered .desktop entry, then a pip `easyread` on PATH.
+  async resolveExecutable() {
+    const configured = String(this.pref("executable", "") || "").trim();
+    if (configured) return configured;
+    if (!Zotero.isLinux) return this.defaultExecutable();
+    if (this.resolvedExecutable && await IOUtils.exists(this.resolvedExecutable)) return this.resolvedExecutable;
+    const found = await this.findLinuxApp();
+    if (found) this.resolvedExecutable = found;
+    return found;
+  },
+  async xdgUserDir(key, fallback) {
+    const home = this.homeDir();
+    let text = "";
+    try { text = await IOUtils.readUTF8(PathUtils.join(home, ".config", "user-dirs.dirs")); }
+    catch (_) { return fallback; }
+    const match = text.match(new RegExp("^" + key + '="([^"]*)"', "m"));
+    if (!match) return fallback;
+    return match[1].replace(/^\$HOME(?=\/|$)/, home).replace(/^~(?=\/|$)/, home) || fallback;
+  },
+  async findLinuxApp() {
+    const home = this.homeDir();
+    // The registered launcher may be a wrapper (for example one that adds --no-sandbox).
+    const fromDesktop = await this.linuxDesktopApp();
+    if (fromDesktop) return fromDesktop;
+    const groups = [
+      [PathUtils.join(home, "Applications")],
+      [PathUtils.join(home, "AppImages"), PathUtils.join(home, "appimages"), PathUtils.join(home, ".local", "bin"), PathUtils.join(home, "bin")],
+      ["/opt", "/usr/local/bin"],
+      [await this.xdgUserDir("XDG_DOWNLOAD_DIR", PathUtils.join(home, "Downloads")), await this.xdgUserDir("XDG_DESKTOP_DIR", PathUtils.join(home, "Desktop"))]
+    ];
+    for (const group of groups) {
+      const hits = [];
+      for (const dir of group) {
+        for (const path of await this.listChildren(dir)) {
+          if (/^EasyRead.*\.AppImage$/i.test(PathUtils.filename(path))) hits.push(path);
+        }
+      }
+      const picked = await this.newestFile(hits);
+      if (picked) return picked;
+    }
+    const pathEnv = Services.env.get("PATH") || "";
+    for (const dir of [...pathEnv.split(":"), PathUtils.join(home, ".local", "bin"), "/usr/local/bin", "/usr/bin"]) {
+      if (!dir) continue;
+      const path = PathUtils.join(dir, "easyread");
+      if (await this.isFile(path)) return path;
+    }
+    return "";
+  },
+  async linuxDesktopApp() {
+    const home = this.homeDir();
+    const dataHome = Services.env.get("XDG_DATA_HOME") || PathUtils.join(home, ".local", "share");
+    const userDirs = new Set([
+      PathUtils.join(dataHome, "applications"),
+      PathUtils.join(home, ".local", "share", "applications")
+    ]);
+    const dirs = [...userDirs, "/usr/local/share/applications", "/usr/share/applications"];
+    const found = [];
+    for (const dir of dirs) {
+      const userDir = userDirs.has(dir);
+      for (const path of await this.listChildren(dir)) {
+        if (!path.endsWith(".desktop")) continue;
+        if (!userDir && !/easyread/i.test(PathUtils.filename(path))) continue;
+        let text = "";
+        try { text = await IOUtils.readUTF8(path); }
+        catch (_) { continue; }
+        let command = EasyReadCore.linuxExec(text);
+        if (command.startsWith("~/")) command = PathUtils.join(home, command.slice(2));
+        if (!command || !PathUtils.isAbsolute(command)) continue;
+        if (await this.isFile(command)) found.push(command);
+      }
+    }
+    return this.newestFile(found);
+  },
+  // Ubuntu 24.04 AppArmor blocks the user namespaces Electron's sandbox needs.
+  async apparmorBlocksSandbox() {
+    try { return (await IOUtils.readUTF8("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")).trim() === "1"; }
+    catch (_) { return false; }
+  },
+  fileExecutable(path) {
+    try {
+      const file = Components.classes["@mozilla.org/file/local;1"].createInstance(Components.interfaces.nsIFile);
+      file.initWithPath(path);
+      return file.isExecutable();
+    } catch (_) { return false; }
+  },
   // Pass a path and arguments, never evaluate a shell command. A macOS .app bundle is a folder that exec()
   // refuses, so it is started (or brought to front, receiving any easyread:// link) through /usr/bin/open.
+  // Ubuntu runs the AppImage or `easyread` directly; Electron reads easyread:// from argv.
   async openApp(args = []) {
-    const executable = this.executable();
+    const executable = await this.resolveExecutable();
+    if (!executable) throw new Error(`找不到 ${this.appName()}，请在 Zotero 设置 → EasyRead 中设置路径。`);
     if (Zotero.isMac) return Zotero.Utilities.Internal.exec("/usr/bin/open", ["-a", executable, ...args]);
-    return Zotero.Utilities.Internal.exec(executable, args);
+    const extra = Zotero.isLinux && /\.AppImage$/i.test(PathUtils.filename(executable)) && await this.apparmorBlocksSandbox() ? ["--no-sandbox"] : [];
+    return Zotero.Utilities.Internal.exec(executable, [...extra, ...args]);
+  },
+  async openProtocol(url) {
+    if (Zotero.isLinux) {
+      if (await IOUtils.exists("/usr/bin/xdg-open")) return Zotero.Utilities.Internal.exec("/usr/bin/xdg-open", [url]);
+      if (await IOUtils.exists("/usr/bin/gio")) return Zotero.Utilities.Internal.exec("/usr/bin/gio", ["open", url]);
+    }
+    Zotero.launchURL(url);
   },
   launch() { this.openApp().catch(error => Zotero.logError(error)); },
   async connect() {
     let conn = await this.probe();
     if (conn) return conn;
-    if (!await IOUtils.exists(this.executable())) throw new Error(`找不到 ${this.appName()}，请在 Zotero 设置 → EasyRead 中设置路径。`);
+    const executable = await this.resolveExecutable();
+    if (!executable || !await IOUtils.exists(executable)) throw new Error(`找不到 ${this.appName()}，请在 Zotero 设置 → EasyRead 中设置路径。`);
+    if (Zotero.isLinux && !this.fileExecutable(executable)) throw new Error(`${executable} 没有可执行权限。请在终端运行：chmod +x "${executable}"`);
     this.launch();
     for (let i = 0; i < 60 && this.alive; i++) {
       await Zotero.Promise.delay(500); conn = await this.probe(); if (conn) return conn;
@@ -223,13 +343,14 @@ var ZoteroEasyRead = {
     if (id && !EasyReadCore.validID(id)) throw new Error("无效的 EasyRead 论文标识。");
     if (conn.api === 1) {
       const target = id ? EasyReadCore.officialOpen(id,anchor,sha256) : "";
-      if (await IOUtils.exists(this.executable())) {
+      const executable = await this.resolveExecutable();
+      if (executable && await IOUtils.exists(executable)) {
         try { await this.openApp(target ? ["easyread://" + target] : []); return; }
         catch (error) { Zotero.logError(error); }
       }
-      // macOS: the app may live elsewhere; whichever copy registered easyread:// still handles the link.
-      if (Zotero.isMac && target) {
-        try { Zotero.launchURL("easyread://" + target); return; }
+      // The app may live elsewhere; whichever copy registered easyread:// still handles the link.
+      if ((Zotero.isMac || Zotero.isLinux) && target) {
+        try { await this.openProtocol("easyread://" + target); return; }
         catch (error) { Zotero.logError(error); }
       }
       Zotero.launchURL(conn.url + (target ? "/" + target : "/"));

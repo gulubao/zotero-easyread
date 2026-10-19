@@ -30,6 +30,24 @@ var EasyReadCore = {
     if (anchor.length > 256) throw new Error("段落标识过长。");
     return {libraryID: Number(match[1]), key: match[2], anchor};
   },
+  // First token of an EasyRead .desktop Exec= line. Anything else is "".
+  linuxExec(text) {
+    const body = String(text || "");
+    if (!/easyread/i.test(body)) return "";
+    const line = body.split(/\r?\n/).map(s => s.trim()).find(s => /^Exec=/i.test(s));
+    if (!line) return "";
+    const rest = line.replace(/^Exec=/i, "").trim();
+    let token = "";
+    if (rest.startsWith('"') || rest.startsWith("'")) {
+      const quote = rest[0];
+      const end = rest.indexOf(quote, 1);
+      if (end <= 1) return "";
+      token = rest.slice(1, end);
+    } else token = rest.split(/\s+/)[0] || "";
+    const name = token.split(/[\\/]/).pop();
+    if (!/^easyread$/i.test(name) && !/^easyread.*\.appimage$/i.test(name)) return "";
+    return token;
+  },
   // No timestamps here: identical reader content produces identical HTML.
   render(state, source, options = {}) {
     if (!state?.paper || !state?.reader || !this.validID(source.id)) throw new Error("EasyRead 笔记数据尚未准备好。");

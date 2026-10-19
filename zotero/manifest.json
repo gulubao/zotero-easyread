@@ -1,12 +1,13 @@
 {
   "manifest_version": 2,
   "name": "Zotero → EasyRead",
-  "version": "0.2.0",
-  "description": "右键用 EasyRead 阅读 PDF，将划线、笔记和保存的 AI 回答回写到 Zotero。支持 macOS 与 Windows。",
+  "version": "0.3.1",
+  "description": "右键用 EasyRead 阅读 PDF，将划线、笔记和保存的 AI 回答回写到 Zotero。支持 macOS、Windows 与 Ubuntu。",
   "author": "apple5089",
   "applications": {"zotero": {
     "id": "zotero-easyread@local.research",
+    "update_url": "https://github.com/gulubao/zotero-easyread/releases/latest/download/update.json",
     "strict_min_version": "8.0",
-    "strict_max_version": "10.0.*"
+    "strict_max_version": "11.*"
   }}
 }

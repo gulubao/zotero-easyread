@@ -4,7 +4,7 @@
 
 在 Zotero 管理论文，用 EasyRead 阅读。右键发送 PDF，复用已有译文和阅读记录，再把阅读笔记手动同步回 Zotero。
 
-本仓库基于 [apple5089/zotero-easyread](https://github.com/apple5089/zotero-easyread) 修改，增加了 macOS 支持和 Zotero 设置页。这是独立的社区集成项目。感谢 [@Edwardxlai](https://github.com/Edwardxlai) 开发 EasyRead、[@apple5089](https://github.com/apple5089) 开发原插件；本项目未获得 EasyRead 官方维护或背书。
+本仓库基于 [apple5089/zotero-easyread](https://github.com/apple5089/zotero-easyread) 修改，增加了 macOS、Ubuntu 支持和 Zotero 设置页。这是独立的社区集成项目。感谢 [@Edwardxlai](https://github.com/Edwardxlai) 开发 EasyRead、[@apple5089](https://github.com/apple5089) 开发原插件；本项目未获得 EasyRead 官方维护或背书。
 
 ## 功能
 
@@ -33,15 +33,15 @@ Windows 上把 `python3` 换成 `py`。运行后生成 `dist/zotero-easyread-<�
 
 ## 安装
 
-已做真实软件测试的环境为 **macOS、Zotero 10.0.6、EasyRead 1.4.2**；原插件在 **Windows、Zotero 10.0.5-beta.2、EasyRead 1.3.0 与 1.3.2** 上测试过。其他 Zotero 8–10 版本和 Linux 尚未测试，不能保证兼容。
+已做真实软件测试的环境为 **macOS、Zotero 10.0.6、EasyRead 1.4.2**；原插件在 **Windows、Zotero 10.0.5-beta.2、EasyRead 1.3.0 与 1.3.2** 上测试过。Ubuntu 按 EasyRead 官方 AppImage 与 `~/EasyRead` 数据目录接入，尚未做同样的联调。清单允许 Zotero 8 到 11；除此之外不能保证兼容。
 
 1. 从 Releases 下载 `zotero-easyread-<版本>.xpi`，或按上一节自己生成。
 2. Zotero → 工具 → 插件 → 齿轮菜单 → 从文件安装插件，选择这个 XPI。
-3. 启动 EasyRead。默认安装位置无需设置：macOS 为 `/Applications/EasyRead.app`，Windows 为 `C:\Program Files\EasyRead\EasyRead.exe`。装在别处时到 **Zotero 设置 → EasyRead**（也可从“工具 → EasyRead：连接设置…”进入）填写路径，留空即自动检测。插件会依次检查已设置的数据目录、Windows 安装目录下的 `data` 和用户目录下的 `EasyRead`。
+3. 启动 EasyRead。默认安装位置无需设置：macOS 为 `/Applications/EasyRead.app`，Windows 为 `C:\Program Files\EasyRead\EasyRead.exe`。Ubuntu 留空时优先使用已注册的 EasyRead `.desktop` 启动项，否则查找 `EasyRead*.AppImage`（`~/Applications`、`~/AppImages`、`~/.local/bin`、`/opt`、`/usr/local/bin`、下载目录和桌面），最后才用 PATH 上的 `easyread`。装在别处时到 **Zotero 设置 → EasyRead**（也可从“工具 → EasyRead：连接设置…”进入）填写路径，留空即自动检测。数据目录依次为：已设置的目录、Windows 安装目录下的 `data`、用户目录下的 `EasyRead`（macOS 与 Ubuntu 的默认位置）。
 4. 右键文献或已下载的 PDF 附件 → **Zotero → EasyRead** 子菜单 → 用 EasyRead 阅读。
 5. 阅读后在同一条目上执行“同步 EasyRead 阅读笔记”。
 
-macOS 上插件通过 `open -a EasyRead.app easyread://open?...` 打开桌面版并定位段落；找不到程序时交给系统注册的 `easyread://` 处理程序，再不行才用浏览器打开本机阅读页。
+macOS 上插件通过 `open -a EasyRead.app easyread://open?...` 打开桌面版并定位段落。Ubuntu 上运行找到的程序并传入同一个 `easyread://` 链接；直接打开 AppImage 时，若系统禁止非特权用户命名空间，会附上 `--no-sandbox`。找不到程序或程序无法启动时，用 `xdg-open` 交给系统已注册的处理程序。都失败才用浏览器打开本机阅读页。AppImage 需要可执行权限（`chmod +x`）。
 
 首次单篇导入默认请求翻译，可在设置中关闭。批量发送始终不自动翻译。
 
@@ -51,7 +51,7 @@ PDF 必须已下载到本机，最大 200 MB。文献包含多个 PDF 时默认�
 
 关联记录保存在 Zotero 配置目录的 `zotero-easyread.json`；启动状态在 `zotero-easyread-status.json`。请勿公开这些运行数据或模型配置。
 
-当前使用 [EasyRead 文档](https://github.com/Edwardxlai/easyread/blob/main/docs/api.md)中的 API v1、PDF 指纹和阅读数据结构，以及 Zotero MenuManager 与设置页接口。PDF 内容替换后会关联新版本，保留旧版本笔记；未知 API 版本会明确提示更新插件。插件不检查自动更新，新版本请到 Releases 下载后重新安装。
+当前使用 [EasyRead 文档](https://github.com/Edwardxlai/easyread/blob/main/docs/api.md)中的 API v1、PDF 指纹和阅读数据结构，以及 Zotero MenuManager 与设置页接口。PDF 内容替换后会关联新版本，保留旧版本笔记；未知 API 版本会明确提示更新插件。Zotero 10 及以上要求清单里有 `update_url`，否则安装会被拒绝，并显示“可能无法与该版本的 Zotero 兼容”。该地址指向 Releases 上的 `update.json`，目前没有发布这个文件，所以不会自动升级；新版本请到 Releases 下载后重新安装。
 
 ## 许可证
 

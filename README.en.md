@@ -4,7 +4,7 @@
 
 Manage papers in Zotero, read them in EasyRead, and manually copy reading notes back into a managed Zotero child note.
 
-This repository is based on [apple5089/zotero-easyread](https://github.com/apple5089/zotero-easyread) and adds macOS support and a Zotero settings pane. It is an independent community integration. Thanks to [@Edwardxlai](https://github.com/Edwardxlai) for EasyRead and [@apple5089](https://github.com/apple5089) for the original plugin. This project is not officially maintained or endorsed by EasyRead.
+This repository is based on [apple5089/zotero-easyread](https://github.com/apple5089/zotero-easyread) and adds macOS and Ubuntu support plus a Zotero settings pane. It is an independent community integration. Thanks to [@Edwardxlai](https://github.com/Edwardxlai) for EasyRead and [@apple5089](https://github.com/apple5089) for the original plugin. This project is not officially maintained or endorsed by EasyRead.
 
 ## Features
 
@@ -33,15 +33,15 @@ On Windows use `py` instead of `python3`. The script writes `dist/zotero-easyrea
 
 ## Installation
 
-Real integration tests cover **macOS, Zotero 10.0.6, and EasyRead 1.4.2**; the original plugin was tested on **Windows, Zotero 10.0.5-beta.2, and EasyRead 1.3.0 / 1.3.2**. Other Zotero 8–10 versions and Linux are untested.
+Real integration tests cover **macOS, Zotero 10.0.6, and EasyRead 1.4.2**; the original plugin was tested on **Windows, Zotero 10.0.5-beta.2, and EasyRead 1.3.0 / 1.3.2**. Ubuntu follows EasyRead's official AppImage and the `~/EasyRead` data directory, and has not had the same end-to-end run. The manifest allows Zotero 8 through 11; anything outside that is untested.
 
 1. Download `zotero-easyread-<version>.xpi` from Releases, or build it as described above.
 2. In Zotero, open Tools → Plugins → gear menu → Install Plugin From File and choose that XPI.
-3. Start EasyRead. Default locations need no setup: `/Applications/EasyRead.app` on macOS, `C:\Program Files\EasyRead\EasyRead.exe` on Windows. Otherwise set the path in **Zotero Settings → EasyRead** (also opened by Tools → `EasyRead：连接设置…`); blank means auto-detect. Discovery checks the configured data directory, `<installation>/data` on Windows, then `~/EasyRead`. Menu labels are currently Chinese.
+3. Start EasyRead. Default locations need no setup: `/Applications/EasyRead.app` on macOS, `C:\Program Files\EasyRead\EasyRead.exe` on Windows. On Ubuntu a blank path uses a registered EasyRead `.desktop` launcher first, then looks for `EasyRead*.AppImage` in `~/Applications`, `~/AppImages`, `~/.local/bin`, `/opt`, `/usr/local/bin`, the download directory, and the desktop, and finally `easyread` on `PATH`. Otherwise set the path in **Zotero Settings → EasyRead** (also opened by Tools → `EasyRead：连接设置…`); blank means auto-detect. Discovery checks the configured data directory, `<installation>/data` on Windows, then `~/EasyRead` (the default on macOS and Ubuntu). Menu labels are currently Chinese.
 4. Right-click an item/PDF → Zotero → EasyRead → `用 EasyRead 阅读`.
 5. After reading, choose `同步 EasyRead 阅读笔记` on the same item.
 
-On macOS the plugin opens the desktop app with `open -a EasyRead.app easyread://open?...`; if the app is not at the configured path it hands the link to whichever app registered `easyread://`, and only then falls back to the local reader page in a browser.
+On macOS the plugin opens the desktop app with `open -a EasyRead.app easyread://open?...`. On Ubuntu it runs the discovered program with the same `easyread://` link. A direct AppImage launch adds `--no-sandbox` when the system blocks unprivileged user namespaces. If that program is missing or fails to start, `xdg-open` hands the link to the registered handler. Only then does it fall back to the local reader page in a browser. An AppImage needs to be executable (`chmod +x`).
 
 The first single-paper import requests translation by default; this can be disabled in settings. Batch import never starts translation automatically.
 
@@ -51,7 +51,7 @@ PDFs must be downloaded locally and at most 200 MB. A regular item uses its pref
 
 Association state is stored in the Zotero profile (`zotero-easyread.json`), startup state in `zotero-easyread-status.json`. Do not publish runtime data or model credentials.
 
-The plugin uses the API v1, PDF fingerprint, and reading data schema documented by [EasyRead](https://github.com/Edwardxlai/easyread/blob/main/docs/api.md), plus Zotero's MenuManager and settings pane APIs. Replacing a PDF's content links the new version and keeps notes from the old one; an unknown API version asks you to update the plugin. The plugin does not auto-update; download new versions from Releases and reinstall.
+The plugin uses the API v1, PDF fingerprint, and reading data schema documented by [EasyRead](https://github.com/Edwardxlai/easyread/blob/main/docs/api.md), plus Zotero's MenuManager and settings pane APIs. Replacing a PDF's content links the new version and keeps notes from the old one; an unknown API version asks you to update the plugin. Zotero 10 and later refuse a plugin whose manifest has no `update_url`, and the dialog only says it may be incompatible with this version of Zotero. The URL points at `update.json` on Releases; that file is not published, so the plugin does not upgrade itself. Download new versions from Releases and reinstall.
 
 ## License
 
